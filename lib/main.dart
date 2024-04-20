@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sample_flutter_firebase_notifications_tutorial/controllers/auth_service.dart';
 import 'package:sample_flutter_firebase_notifications_tutorial/controllers/notification_service.dart';
@@ -20,6 +21,24 @@ Future _firebaseBackgroundMessage(RemoteMessage message) async {
   }
 }
 
+// to handle notification on foreground on web platform
+void showNotification({required String title, required String body}) {
+  showDialog(
+    context: navigatorKey.currentContext!,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: Text(body),
+      actions: [
+        TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: Text("Ok"))
+      ],
+    ),
+  );
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -30,7 +49,10 @@ void main() async {
   await PushNotifications.init();
 
   // initialize local notifications
-  await PushNotifications.localNotiInit();
+  // dont use local notifications for web platform
+  if (!kIsWeb) {
+    await PushNotifications.localNotiInit();
+  }
 
   // Listen to background notifications
   FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundMessage);
@@ -43,15 +65,21 @@ void main() async {
     }
   });
 
-  // to handle foreground notifications
+// to handle foreground notifications
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     String payloadData = jsonEncode(message.data);
     print("Got a message in foreground");
     if (message.notification != null) {
-      PushNotifications.showSimpleNotification(
-          title: message.notification!.title!,
-          body: message.notification!.body!,
-          payload: payloadData);
+      if (kIsWeb) {
+        showNotification(
+            title: message.notification!.title!,
+            body: message.notification!.body!);
+      } else {
+        PushNotifications.showSimpleNotification(
+            title: message.notification!.title!,
+            body: message.notification!.body!,
+            payload: payloadData);
+      }
     }
   });
 
